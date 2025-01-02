@@ -9,4 +9,4 @@ adversarial attacks on vocie activity detection
 
 ### git
 
-1. [rep 1](github.com/NickWilkinson37/voxseg)
+1. [rep 1](@NickWilkinson37/voxseg)
