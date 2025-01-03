@@ -1,3 +1,11 @@
+# files
+*.wav
+*.mp3
+Data
+*.tgz
+*.zip
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
