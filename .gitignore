@@ -1,3 +1,9 @@
+# specific files
+
+datasets/speech16.wav
+
+
+
 # files
 *.wav
 *.mp3
