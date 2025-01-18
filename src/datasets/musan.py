@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import soundfile as sr
 from typing import Union 
-from src.utils.data_utils import read_torch
+from src.utils.audio_utils import read_torch
 
 
 class MusanMusicDataset(Dataset):
@@ -23,7 +23,8 @@ class MusanMusicDataset(Dataset):
         self.target_sample_rate = target_sample_rate
 
         # Get all wav files recursively
-        self.file_paths = list(self.root_dir.rglob("*.wav"))
+        self.file_paths = [sample for sample in list(self.root_dir.rglob("*.wav")) if 'fma' not in str(sample)]
+        
         if not self.file_paths:
             raise RuntimeError(f"No .wav files found in {root_dir}")
         self.source_sample_rate = sr.read(self.file_paths[0])[1]
@@ -82,10 +83,13 @@ class MusanMusicDataset(Dataset):
         """
         if self.segment_length:
             segment_length = np.random.randint(low=self.segment_length[0],high=self.segment_length[1]+1, size=1)[-1]
-            return self.get_random_segment(idx, segment_length)
-        else:
-            return read_torch(self.file_paths[idx])[0]
-
+            audio =  self.get_random_segment(idx, segment_length)
+            return {'sample': audio}
+            
+        audio = read_torch(self.file_paths[idx])[0]
+        return {'sample': audio}
+    
+    
     def check_length(self, idx):
         if self.file_lengths[self.file_paths[idx]] < self.segment_length[1]:
             return False

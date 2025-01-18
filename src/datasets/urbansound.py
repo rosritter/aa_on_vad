@@ -26,7 +26,7 @@ class UrbanSoundDataset(Dataset):
     def __getitem__(self, idx):
         audio = torch.tensor(self.audios[idx], dtype=torch.float32)
         label = self.labels[idx].decode('utf-8')  # decode bytes to string
-        return audio, label
+        return {'sample':audio, 'label': label}
     
 
 if __name__ == '__main__':
