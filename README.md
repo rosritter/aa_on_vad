@@ -22,3 +22,9 @@ adversarial attacks on vocie activity detection
 3. [esc-50](https://github.com/karolpiczak/ESC-50)
 
 next step trying to learn model
+
+
+
+### Env. prep.
+
+`export PYTHONPATH=$PWD:$PATH`

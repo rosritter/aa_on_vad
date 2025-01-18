@@ -4,9 +4,12 @@ import torchaudio
 from pathlib import Path
 import numpy as np
 import soundfile as sr
+from typing import Union 
+from src.utils.data_utils import read_torch
+
 
 class MusanMusicDataset(Dataset):
-    def __init__(self, root_dir, segment_length:tuple[int,int]=(16000, 16000), target_sample_rate=16000, random_start_point:bool=True):
+    def __init__(self, root_dir, segment_length:Union[tuple[int,int],None]=(16000, 16000), target_sample_rate=16000, random_start_point:bool=True):
         """
         Args:
             root_dir (str): Directory with all the music wav files
@@ -31,7 +34,7 @@ class MusanMusicDataset(Dataset):
         for path in self.file_paths:
             info = torchaudio.info(path)
             length = int(info.num_frames / self.source_sample_rate * self.target_sample_rate)
-            if length >= self.segment_length[1]:
+            if not self.segment_length or length >= self.segment_length[1]: # god please i`m trying to write oneline in python
                 file_paths.append(path)
                 self.file_lengths[path] = length
         self.file_paths = file_paths
@@ -49,16 +52,9 @@ class MusanMusicDataset(Dataset):
     
         file_path = self.file_paths[idx]
         file_length = self.file_lengths[file_path]
-            
-        # Load audio
-        waveform, sr = torchaudio.load(file_path)
-        if waveform.ndim > 1:
-            print(waveform.shape)
-            waveform = waveform[0, :]
-        # Resample if necessary
+        waveform = read_torch(file_path)
         if sr != self.target_sample_rate:
             waveform = self.resampler(waveform)
-        
         # Get random start point
         if self.random_start_point:
             max_start = file_length - target_length
@@ -84,8 +80,11 @@ class MusanMusicDataset(Dataset):
         Returns:
             torch.Tensor: Audio segment of length self.segment_length
         """
-        segment_length = np.random.randint(low=self.segment_length[0],high=self.segment_length[1]+1, size=1)[-1]
-        return self.get_random_segment(idx, segment_length)
+        if self.segment_length:
+            segment_length = np.random.randint(low=self.segment_length[0],high=self.segment_length[1]+1, size=1)[-1]
+            return self.get_random_segment(idx, segment_length)
+        else:
+            return read_torch(self.file_paths[idx])[0]
 
     def check_length(self, idx):
         if self.file_lengths[self.file_paths[idx]] < self.segment_length[1]:
@@ -96,6 +95,6 @@ if __name__ == '__main__':
     dataset = MusanMusicDataset(
     root_dir='datasets/musan/music',
     target_sample_rate=16000,
-    segment_length=(16000, 32000)
+    segment_length=None#(16000, 32000)
     )
     print(dataset[1].shape)
