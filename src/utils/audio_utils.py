@@ -68,6 +68,28 @@ def remove_silence(audio, sample_rate, energy_threshold=0.02, step_duration=0.01
     return waveform
     
 
+def remove_silence_from_beginning(audio, sample_rate, energy_threshold=0.02, step_duration=0.01):
+    if len(audio.shape) == 1:
+        audio = audio.unsqueeze(0)  # Convert to 2D for consistency (1, num_samples)
+    step_size = int(step_duration * sample_rate)
+    if step_size <= 0:
+        raise ValueError("Step size must be greater than 0.")
+
+    cut_idx = 0
+    for start in range(0, audio.shape[1], step_size):
+        end = min(start + step_size, audio.shape[1])
+        chunk = audio[:, start:end]
+
+        # Compute energy of the chunk
+        energy = torch.sqrt(torch.mean(chunk**2))
+
+        # Retain chunk if energy exceeds the threshold
+        if energy > energy_threshold:
+            cut_idx = start
+            break
+    
+    return audio[:,cut_idx:]
+
 def vad_forward(waveform: torch.Tensor, vad: callable, sample_rate: int = 16000, step_sec=1, idx: int = 0) -> torch.Tensor:
     """
     Processes a waveform by removing silent segments using a given VAD function.
