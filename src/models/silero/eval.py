@@ -1,111 +1,60 @@
+import torch.nn.functional as F
 import torch
-import torchaudio
 
-def process_audio_sample(model, audio_path, sr=16000):
+
+@torch.no_grad()
+def get_vad_mask(
+    audio: torch.Tensor,
+    model,
+    threshold: float = 0.5,
+    sample_rate: int = 16000,
+    window_size_samples: int = 512
+) -> torch.Tensor:
     """
-    Process a single audio file through Silero VAD model.
+    Convert VAD model predictions into a binary mask.
     
     Args:
-        model: Loaded Silero VAD model
-        audio_path: Path to audio file
-        sr: Sampling rate (16000 or 8000)
-    
+        audio: torch.Tensor - Input audio (1D tensor)
+        model: VAD model
+        threshold: float - Speech probability threshold
+        sample_rate: int - Audio sampling rate
+        window_size_samples: int - Window size for processing
+        
     Returns:
-        Tensor of speech probabilities for each time window
+        torch.Tensor - Binary mask of same length as input audio
     """
-    # First, let's load and preprocess the audio
-    # torchaudio.load returns a tuple of (waveform, sample_rate)
-    waveform, source_sr = torchaudio.load(audio_path)
+    # Ensure audio is 1D
+    if not torch.is_tensor(audio):
+        audio = torch.tensor(audio)
+    audio = audio.squeeze()
     
-    # If audio has multiple channels, convert to mono by averaging
-    if waveform.shape[0] > 1:
-        waveform = waveform.mean(dim=0, keepdim=True)
+    # Handle sample_rate
+    if sample_rate > 16000 and (sample_rate % 16000 == 0):
+        step = sample_rate // 16000
+        sample_rate = 16000
+        audio = audio[::step]
     
-    # Resample if the source sample rate is different from target
-    if source_sr != sr:
-        resampler = torchaudio.transforms.Resample(source_sr, sr)
-        waveform = resampler(waveform)
+    # Reset model states
+    if hasattr(model, 'reset_states'):
+        model.reset_states()
     
-    # The model expects input shape [batch_size, audio_length]
-    # waveform is currently [1, audio_length], which is correct
+    # Initialize mask
+    audio_length = len(audio)
+    mask = torch.zeros(audio_length)
+    # Process audio in windows
+    for start_idx in range(0, audio_length, window_size_samples):
+        # Get chunk
+        chunk = audio[start_idx: start_idx + window_size_samples]
+        
+        # Pad last chunk if needed
+        if len(chunk) < window_size_samples:
+            chunk = F.pad(chunk, (0, window_size_samples - len(chunk)))
+        
+        # Get prediction
+        speech_prob = model(chunk, sample_rate).item()
+        
+        # Fill mask for this window
+        end_idx = min(start_idx + window_size_samples, audio_length)
+        mask[start_idx:end_idx] = float(speech_prob >= threshold)
     
-    # Get speech probabilities from the model
-    # The model internally handles:
-    # 1. STFT transformation
-    # 2. Feature extraction through encoder
-    # 3. Sequential processing through decoder
-    speech_probs = model.audio_forward(waveform, sr=sr)
-    
-    return speech_probs
-
-# Load the model
-model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad', 
-                            model='silero_vad')
-model.eval()  # Set to evaluation mode
-
-# Example usage
-audio_path = "datasets/speech16.wav"
-speech_probabilities = process_audio_sample(model, audio_path)
-
-# The output speech_probabilities has shape [1, num_windows]
-# Each value is between 0 and 1, representing speech probability
-# Time resolution is approximately 50ms per window
-
-# To get binary speech/non-speech decisions, we can apply a threshold
-# Default threshold is usually around 0.5
-speech_mask = (speech_probabilities > 0.5).float()
-
-# Print some information about the predictions
-print(f"Number of time windows: {speech_probabilities.shape[1]}")
-print(f"Detected speech in {speech_mask.sum().item()} windows")
-
-# If you want to get time stamps of speech segments
-def get_speech_timestamps(speech_probs, threshold=0.5, window_size_ms=50):
-    """
-    Convert model predictions to time stamps of speech segments.
-    
-    Args:
-        speech_probs: Model predictions
-        threshold: Classification threshold
-        window_size_ms: Size of each window in milliseconds
-    
-    Returns:
-        List of dictionaries containing start and end times in seconds
-    """
-    mask = (speech_probs[0] > threshold).cpu().numpy()
-    speech_segments = []
-    
-    in_speech = False
-    start_idx = 0
-    
-    for i, is_speech in enumerate(mask):
-        if is_speech and not in_speech:
-            start_idx = i
-            in_speech = True
-        elif not is_speech and in_speech:
-            # Convert window indices to seconds
-            start_time = start_idx * window_size_ms / 1000
-            end_time = i * window_size_ms / 1000
-            speech_segments.append({
-                'start': start_time,
-                'end': end_time
-            })
-            in_speech = False
-    
-    # Handle if audio ends during speech
-    if in_speech:
-        start_time = start_idx * window_size_ms / 1000
-        end_time = len(mask) * window_size_ms / 1000
-        speech_segments.append({
-            'start': start_time,
-            'end': end_time
-        })
-    
-    return speech_segments
-
-# Get time stamps of speech segments
-timestamps = get_speech_timestamps(speech_probabilities)
-
-# Print the speech segments
-for segment in timestamps:
-    print(f"Speech from {segment['start']:.2f}s to {segment['end']:.2f}s")
+    return mask

@@ -23,7 +23,7 @@ class MusanMusicDataset(Dataset):
         self.target_sample_rate = target_sample_rate
 
         # Get all wav files recursively
-        self.file_paths = [sample for sample in list(self.root_dir.rglob("*.wav")) if 'fma' not in str(sample)]
+        self.file_paths = [sample for sample in list(self.root_dir.rglob("*.wav")) if 'fma' not in str(sample) or 'jamendo' not in str(sample)]
         
         if not self.file_paths:
             raise RuntimeError(f"No .wav files found in {root_dir}")

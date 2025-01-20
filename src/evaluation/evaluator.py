@@ -1,6 +1,9 @@
 import torch
 from typing import Dict, List, Tuple, Union
 import numpy as np
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+from src.models.silero.eval import get_vad_mask
 
 
 class VADEvaluator:
@@ -119,6 +122,40 @@ def evaluate_vad_dataset(
     metrics = evaluator.compute()
     return metrics
 
+
+
+def validate_silero_vad(model, dataset, device, get_mask=get_vad_mask):
+    """
+    Validate Silero VAD model using the VADEvaluator
+    
+    Args:
+        model: Silero VAD model instance
+        dataset: Dataset instance providing audio samples and labels
+        device: torch device
+        batch_size: batch size for DataLoader
+    """
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
+    evaluator = VADEvaluator(threshold=0.5)
+    sample_rate = 16000
+    model.eval()
+    with torch.no_grad():
+        for batch in tqdm(dataloader):
+            # Move data to device
+            wavs = batch['sample'].to(device)
+            masks_true = batch['mask'].to(device)
+            
+            # Process each audio in batch
+            mask_pred = get_mask(
+                wavs, 
+                model, 
+                sample_rate=sample_rate)
+            
+            # Update evaluator
+            evaluator.update(mask_pred, masks_true)
+    
+    # Compute and return metrics
+    metrics = evaluator.compute()
+    return metrics
 
 # Example usage:
 """
