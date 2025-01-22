@@ -300,12 +300,15 @@ class VADMixedDataset(Dataset):
         }
     
 
-def get_datset():
+def get_datset(mode='test', erase_silence=None):
     from src.datasets.librispeech import get_librispeech_example, LibriSpeechWrapper
     from src.datasets.urbansound import UrbanSoundDataset, read_arrf
     from src.datasets.musan import MusanMusicDataset
 
     speech_datasets = [
+        
+    LibriSpeechWrapper(get_librispeech_example(), erase_silence=True)
+    if erase_silence else
     LibriSpeechWrapper(get_librispeech_example(), remove_silence_on_edges=True)
     ]
 
@@ -324,7 +327,8 @@ def get_datset():
                                         fixed_length=6.0,
                                         speech_proportion=0.3,
                                         synthetic_noise_prob=0.2,
-                                        deterministic=True
+                                        deterministic=True,
+                                        mode=mode
                                         )
     return vad_dataset_fixed
 
