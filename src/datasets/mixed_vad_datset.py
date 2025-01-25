@@ -306,19 +306,18 @@ def get_datset(mode='test', erase_silence=None):
     from src.datasets.musan import MusanMusicDataset
 
     speech_datasets = [
-        
     LibriSpeechWrapper(get_librispeech_example(), erase_silence=True)
     if erase_silence else
     LibriSpeechWrapper(get_librispeech_example(), remove_silence_on_edges=True)
     ]
 
     noise_datasets = [
-    MusanMusicDataset(
-    root_dir='datasets/musan/music',
-    target_sample_rate=16000,
-    segment_length=None
-    ),
-    UrbanSoundDataset(read_arrf())
+        MusanMusicDataset(
+        root_dir='datasets/musan/music',
+        target_sample_rate=16000,
+        segment_length=None
+        ),
+        UrbanSoundDataset(read_arrf())
     ]
     vad_dataset_fixed = VADMixedDataset(
                                         speech_datasets=speech_datasets,
@@ -330,6 +329,7 @@ def get_datset(mode='test', erase_silence=None):
                                         deterministic=True,
                                         mode=mode
                                         )
+
     return vad_dataset_fixed
 
 

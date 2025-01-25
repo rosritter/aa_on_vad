@@ -4,76 +4,57 @@ import numpy as np
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from src.models.silero.eval import get_vad_mask
+from sklearn.metrics import roc_auc_score, roc_curve
 
 
 class VADEvaluator:
     def __init__(self, threshold: float = 0.5):
-        """
-        Initialize the VAD evaluator.
-
-        Args:
-            threshold (float): Threshold for converting probabilities to binary predictions
-        """
         self.threshold = threshold
         self.reset()
 
     def reset(self):
-        """Reset all accumulated statistics"""
-        self.total_tp = 0
-        self.total_fp = 0
-        self.total_tn = 0
-        self.total_fn = 0
+        self.all_predictions = []
+        self.all_labels = []
 
     def update(self, predictions: torch.Tensor, labels: torch.Tensor) -> None:
-        """
-        Update metrics with a new batch of predictions and labels.
+        # Store raw predictions for later computation
+        predictions_cpu = predictions.detach().cpu()
+        labels_cpu = labels.detach().cpu()
+        
+        if predictions_cpu.dim() == 3:
+            predictions_cpu = predictions_cpu.squeeze(1)
+        if labels_cpu.dim() == 3:
+            labels_cpu = labels_cpu.squeeze(1)
+            
+        self.all_predictions.extend(predictions_cpu.flatten().numpy())
+        self.all_labels.extend(labels_cpu.flatten().numpy())
 
-        Args:
-            predictions (torch.Tensor): Model predictions (B, T) or (B, 1, T)
-            labels (torch.Tensor): Ground truth labels (B, T) or (B, 1, T)
-        """
-        # Ensure tensors are on CPU and convert to binary
-        predictions = (predictions.detach().cpu() > self.threshold).float()
-        labels = labels.detach().cpu().float()
+    def compute(self, threshold: float = None) -> Dict[str, float]:
+        if threshold is not None:
+            self.threshold = threshold
+            
+        # Convert lists to numpy arrays for efficient computation
+        predictions = np.array(self.all_predictions)
+        labels = np.array(self.all_labels)
+        binary_preds = (predictions > self.threshold).astype(float)
+        
+        # Compute confusion matrix
+        tp = np.sum((binary_preds == 1) & (labels == 1))
+        fp = np.sum((binary_preds == 1) & (labels == 0))
+        tn = np.sum((binary_preds == 0) & (labels == 0))
+        fn = np.sum((binary_preds == 0) & (labels == 1))
 
-        # Ensure shapes match
-        if predictions.dim() == 3:
-            predictions = predictions.squeeze(1)
-        if labels.dim() == 3:
-            labels = labels.squeeze(1)
-
-        # Calculate confusion matrix elements
-        tp = ((predictions == 1) & (labels == 1)).sum().item()
-        fp = ((predictions == 1) & (labels == 0)).sum().item()
-        tn = ((predictions == 0) & (labels == 0)).sum().item()
-        fn = ((predictions == 0) & (labels == 1)).sum().item()
-
-        # Update totals
-        self.total_tp += tp
-        self.total_fp += fp
-        self.total_tn += tn
-        self.total_fn += fn
-
-    def compute(self) -> Dict[str, float]:
-        """
-        Compute final metrics.
-
-        Returns:
-            Dict[str, float]: Dictionary containing various metrics
-        """
-        # Avoid division by zero
         eps = 1e-8
-
-        # Calculate metrics
-        precision = self.total_tp / (self.total_tp + self.total_fp + eps)
-        recall = self.total_tp / (self.total_tp + self.total_fn + eps)
+        precision = tp / (tp + fp + eps)
+        recall = tp / (tp + fn + eps)
         f1 = 2 * precision * recall / (precision + recall + eps)
-        accuracy = (self.total_tp + self.total_tn) / (self.total_tp + self.total_tn +
-                                                      self.total_fp + self.total_fn + eps)
+        accuracy = (tp + tn) / (tp + tn + fp + fn + eps)
+        fpr = fp / (fp + tn + eps)
+        tpr = recall
 
-        # Calculate false positive rate and true positive rate for ROC
-        fpr = self.total_fp / (self.total_fp + self.total_tn + eps)
-        tpr = recall  # Same as recall
+        # Compute ROC-AUC
+        roc_auc = roc_auc_score(labels, predictions)
+        fpr_curve, tpr_curve, _ = roc_curve(labels, predictions)
 
         return {
             'precision': precision,
@@ -81,7 +62,12 @@ class VADEvaluator:
             'f1_score': f1,
             'accuracy': accuracy,
             'false_positive_rate': fpr,
-            'true_positive_rate': tpr
+            'true_positive_rate': tpr,
+            'roc_auc': roc_auc,
+            'roc_curve': {
+                'fpr': fpr_curve,
+                'tpr': tpr_curve
+            }
         }
 
 
