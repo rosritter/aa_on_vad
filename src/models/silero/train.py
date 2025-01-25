@@ -18,6 +18,8 @@ def train_step(batch, noise_producer, vad_model, criterion, optimizer, device):
     state = torch.zeros((2, wavs.shape[0], 128)).to(device) # fixed for silero
     # Pad input for context
     x = torch.nn.functional.pad(wavs, (context_size, wavs.shape[-1] % num_samples))
+    noise = noise_producer(x)
+    x = x + noise
     outs = []
     noises = []
 
@@ -25,14 +27,8 @@ def train_step(batch, noise_producer, vad_model, criterion, optimizer, device):
         # Get current window with context
         input_window = x[:, i - context_size:i + num_samples]
 
-        # Generate noise for main window (without context)
-        chunk_noise = noise_producer(input_window)
-
-        noisy_window = input_window + chunk_noise
-        noises.append(chunk_noise)
-
         # Process through VAD
-        out = vad_model._model.stft(noisy_window)
+        out = vad_model._model.stft(input_window)
         out = vad_model._model.encoder(out)
         out, state = vad_model._model.decoder(out, state)
         outs.append(out)
@@ -44,8 +40,6 @@ def train_step(batch, noise_producer, vad_model, criterion, optimizer, device):
         size=masks.shape[1],
         mode='linear'
     ).squeeze(1)
-
-    noise = torch.cat(noises, dim=1)
 
     # Calculate loss using masks
     loss = criterion(vad_output, noise, masks)
@@ -75,7 +69,7 @@ def train_loop(dataloader, noise_producer, vad_model, criterion, optimizer, devi
         # Update progress bar postfix without newlines
         pbar.set_postfix({'loss': f"{loss / batch['sample'].shape[0]:.4f}"})
         pbar.refresh()  # Force immediate update
-    return total_loss / len(dataloader)
+    return total_loss / len(dataloader.dataset)
 
 def eval_loop(dataloader, noise_producer, vad_model, criterion, device):
     noise_producer.eval()
@@ -89,12 +83,11 @@ def eval_loop(dataloader, noise_producer, vad_model, criterion, device):
     return total_loss / len(dataloader)
 
 def train_noise_producer(noise_producer, vad_model, train_dataset, val_dataset, 
-                        epochs=10, batch_size=32, lr=1e-4, device='cuda'):
+                        criterion=AdversarialLoss(), epochs=10, batch_size=32, lr=1e-4, device='cuda'):
     # Freeze VAD model
     for param in vad_model.parameters():
         param.requires_grad = False
     print(f'Noise producer model has {sum(p.numel() for p in noise_producer.parameters())} parametes')
-    criterion = AdversarialLoss()
     optimizer = torch.optim.Adam(noise_producer.parameters(), lr=lr)
     
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
