@@ -304,7 +304,7 @@ def get_datset(mode='test', erase_silence=None):
     from src.datasets.librispeech import get_librispeech_example, LibriSpeechWrapper
     from src.datasets.urbansound import UrbanSoundDataset, read_arrf
     from src.datasets.musan import MusanMusicDataset
-
+    assert False, "you need to change librispeech test/train mode!"
     speech_datasets = [
     LibriSpeechWrapper(get_librispeech_example(), erase_silence=True)
     if erase_silence else
