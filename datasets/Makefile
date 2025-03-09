@@ -22,7 +22,7 @@ URBAN_SOUND_LINK = https://timeseriesclassification.com/aeon-toolkit/UrbanSound.
 all: esc50 musan urbansound librispeech
 
 esc50:
-	wget -P $(DATASET_DIR) ESC_LINK 
+	wget -P $(DATASET_DIR) $(ESC_LINK) 
 	unzip $(DATASET_DIR)/master.zip -d $(DATASET_DIR)
 
 
@@ -31,8 +31,8 @@ musan:
 	tar -xzvf $(DATASET_DIR)/musan.tar.gz -C $(DATASET_DIR)
 
 urbansound:
-	wget -P $(DATASET_DIR) URBAN_SOUND_LINK 
+	wget -P $(DATASET_DIR) $(URBAN_SOUND_LINK) 
 	unzip $(DATASET_DIR)/UrbanSound.zip -d $(DATASET_DIR)
 
 librispeech:
-	python !(DATASET_DIR)/torchlibri/download_torch_libri_ds.py
+	python $(DATASET_DIR)/torchlibri/download_torch_libri_ds.py
