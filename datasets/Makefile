@@ -3,7 +3,7 @@ DATASET_DIR = datasets
 
 # ESC (noise)
 # github.com/karolpiczak/ESC-50
-ESC_LINK = github.com/karolpiczak/ESC-50
+ESC_LINK = github.com/karolpiczak/ESC-50#download
 
 # Musan mirrors	
 # Summary: A corpus of music, speech, and noise
