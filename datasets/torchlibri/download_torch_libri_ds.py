@@ -19,7 +19,7 @@ def parse_set():
     return args.set
     
 if __name__ == '__main__':
-    current_file_path = os.path.abspath(__file__)
+    current_file_path = '/'.join(os.path.abspath(__file__).split('/')[:-1])
     tset = parse_set()
     torchaudio.datasets.LIBRISPEECH(
                                     root=current_file_path, 
