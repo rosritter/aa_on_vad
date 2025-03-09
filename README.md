@@ -28,3 +28,6 @@ next step trying to learn model
 ### Env. prep.
 
 `export PYTHONPATH=$PWD:$PATH`
+
+### Download datasets
+`!make -f datasets/Makefile all`
