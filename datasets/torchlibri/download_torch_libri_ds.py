@@ -17,12 +17,15 @@ def parse_set():
     # Parse the arguments
     args = parser.parse_args()
     return args.set
-    
-if __name__ == '__main__':
-    current_file_path = '/'.join(os.path.abspath(__file__).split('/')[:-1])
-    tset = parse_set()
+
+
+def download_libri(current_path, tset):
     torchaudio.datasets.LIBRISPEECH(
-                                    root=current_file_path, 
+                                    root=current_path, 
                                     url=tset, 
                                     download=True,
                                     )
+if __name__ == '__main__':
+    current_path = '/'.join(os.path.abspath(__file__).split('/')[:-1])
+    tset = parse_set()
+    download_libri(current_path, tset)
